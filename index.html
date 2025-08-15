@@ -441,5 +441,20 @@
     // 初始化：载入首张
     showCard();
   </script>
+
+<script>
+// Safely move the 复习“需要练习” button above the arrow nav without touching functionality.
+document.addEventListener('DOMContentLoaded', function () {
+  try {
+    var nav = document.querySelector('.nav');
+    var review = document.getElementById('reviewControls');
+    if (nav && review && nav.parentNode) {
+      nav.parentNode.insertBefore(review, nav);
+    }
+  } catch (e) {
+    console.error('Reorder failed:', e);
+  }
+});
+</script>
 </body>
 </html>
