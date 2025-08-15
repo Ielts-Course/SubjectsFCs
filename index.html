@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>英汉词汇闪卡</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    :root {
+      --card-w: 88vw; --card-max-w: 520px;
+      --card-h: 60vh; --card-max-h: 600px;
+      --radius: 14px;
+      --shadow: 0 8px 24px rgba(0,0,0,0.08);
+      --brand: #0f766e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "PingFang SC","Noto Sans SC","Microsoft YaHei", sans-serif;
+      margin: 0; padding: 0;
+      min-height: 100vh; background: #f7faf9;
+      display: flex; flex-direction: column; align-items: center;
+    }
+    .site-header { display:flex; align-items:center; gap:14px; margin:20px 16px 6px; }
+    .site-header img { height:72px; width:auto; }
+    .site-title { font-weight: 800; font-size: 1.25rem; color:#0b3c39; text-align: center;}
+    .site-instruction { margin: 0 16px 14px; color:#334; }
+
+    .card-container {
+      position: relative;
+      width: var(--card-w); max-width: var(--card-max-w);
+      height: var(--card-h); max-height: var(--card-max-h);
+      perspective: 1000px;
+      margin-bottom: 12px;
+    }
+    .card {
+      position: absolute; inset: 0;
+      transform-style: preserve-3d;
+      transition: transform .6s ease;
+    }
+    .front, .back {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      border-radius: var(--radius); background: #fff; border:1px solid #e8ebe9; box-shadow: var(--shadow);
+      padding: 28px;
+      backface-visibility: hidden;
+    }
+    .back { transform: rotateY(180deg); }
+    .card.flipped { transform: rotateY(180deg); }
+
+    .word { font-size: clamp(2.2rem, 8vw, 3.2rem); font-weight: 800; color:#0b3c39; text-align:center; line-height:1.05; }
+    .phon { margin-top: 10px; font-size: clamp(1rem, 3.5vw, 1.4rem); color:#6b7c7a; font-weight: 500; letter-spacing:.3px; }
+    .translation-zh { font-size: clamp(1.4rem, 4.5vw, 1.8rem); color:#0b3c39; font-weight: 700; text-align:center; }
+    .example { margin-top: 14px; width:100%; max-width: 520px; text-align:center; }
+    .ex-en { font-size: 1.05rem; color:#1f2937; margin-bottom: 6px; text-align:center; }
+    .ex-zh { font-size: 1.05rem; color:#374151; text-align:center; }
+    .highlight { font-weight: 800; color: var(--brand); }
+
+    .audio-front, .audio-back { margin-top: 16px; font-size: 1.4rem; cursor:pointer; user-select:none; }
+    .buttons-container { display:flex; gap:10px; width: var(--card-w); max-width: var(--card-max-w); margin-bottom: 16px; }
+    .btn { flex:1; padding: 12px; border:none; border-radius: 10px; font-size:1rem; cursor:pointer; box-shadow: 0 2px 4px rgba(0,0,0,.06); }
+    .know { background:#c7f9cc; }
+    .practice { background:#ffddd2; }
+
+    .nav { display:flex; justify-content:space-between; width:var(--card-w); max-width: var(--card-max-w); margin-bottom: 16px; }
+    .nav button { font-size:2rem; background:none; border:none; cursor:pointer; }
+
+    .hidden { display:none; }
+
+    #congratsMsg {
+      position:absolute; inset:0; background:#fff; border-radius:var(--radius); box-shadow: var(--shadow); padding: 20px;
+    }
+    #congratsMsg:not(.hidden) { display:flex; flex-direction:column; align-items:center; justify-content:center; z-index: 2; gap: 10px; }
+    #congratsMsg input { padding:10px; border:1px solid #e5e7eb; border-radius:10px; width: 100%; max-width: 320px; }
+    #congratsActions { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
+    #downloadPdfBtn { background:#dbeafe; }
+    #reviewAll { background:#e5e7eb; }
+
+    footer { margin-top:auto; font-size:.85rem; color:#6b7280; text-align:center; padding: 18px 10px; width:100%; }
+
+    @media print {
+      body { background: #fff; }
+      .site-header, .site-instruction, .card-container, .buttons-container, .nav, #reviewControls, footer, #congratsMsg { display: none !important; }
+      #pdfReport { display: block !important; }
+    }
+    #pdfReport { display:none; padding: 24px; max-width: 980px; margin: 0 auto; font-size: 14px; color:#111827; }
+    #pdfReport h1 { font-size: 1.5rem; margin: 0 0 8px; }
+    #pdfReport h2 { font-size: 1.2rem; margin: 18px 0 8px; }
+    #pdfReport table { width:100%; border-collapse: collapse; margin-top: 8px; }
+    #pdfReport th, #pdfReport td { border: 1px solid #e5e7eb; padding: 8px; text-align: left; }
+    #pdfReport .muted { color:#6b7280; }
+    #pdfReport .score-row { font-size: 1.3rem; font-weight: 800; color: var(--brand); }
+  </style>
+</head>
+<body>
+
+  <div class="site-header">
+    <img src="LOGO.png" alt="BFSU Logo">
+    <div class="site-title" id="siteTitle">词汇闪卡</div>
+  </div>
+  <p class="site-instruction" id="siteInstr">点击卡片以翻转。点击音频图标🔊可收听单词或句子。</p>
+
+  <div class="card-container">
+    <div id="card" class="card">
+      <div class="front" role="button" aria-label="翻转卡片">
+        <div id="frontWord" class="word"></div>
+        <div id="frontPhon" class="phon"></div>
+        <button id="audioFront" class="audio-front" title="播放单词音频" aria-label="播放单词音频">🔊</button>
+      </div>
+      <div class="back" role="button" aria-label="翻转卡片">
+        <div id="backTransZh" class="translation-zh"></div>
+        <div class="example">
+          <div id="exEn" class="ex-en"></div>
+          <div id="exZh" class="ex-zh"></div>
+        </div>
+        <button id="audioBack" class="audio-back" title="播放例句音频" aria-label="播放例句音频">🔊</button>
+      </div>
+    </div>
+    <div id="congratsMsg" class="hidden">
+      <h2>太棒了！🎉</h2>
+      <input id="studentId" placeholder="姓名 / 学号（可选）">
+      <div id="congratsSummary" class="muted"></div>
+      <div id="congratsActions">
+        <button id="downloadPdfBtn" class="btn">下载 PDF</button>
+        <button id="reviewAll" class="btn">复习所有单词</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="buttons-container">
+    <button id="knowBtn" class="btn know">已掌握</button>
+    <button id="practiceBtn" class="btn practice">需要练习</button>
+  </div>
+
+  <div class="nav">
+    <button id="prevBtn" aria-label="上一张">&larr;</button>
+    <button id="nextBtn" aria-label="下一张">&rarr;</button>
+  </div>
+
+  <div id="reviewControls" class="hidden">
+    <button id="reviewPractice" class="btn">复习“需要练习”</button>
+  </div>
+
+  <!-- 隐藏的可打印报告：只含摘要 -->
+  <section id="pdfReport">
+    <h1>学习表现报告</h1>
+    <div id="reportMeta"></div>
+    <h2>摘要</h2>
+    <table>
+      <tbody id="summaryTable"></tbody>
+    </table>
+    <p class="muted">此报告由前端页面本地生成，可放心保存并发送给老师。</p>
+  </section>
+
+  <footer>©2025 Dr. Carlos Cardenas • 教育管理学博士</footer>
+
+  <script>
+    // ====== 词表数据（动态：随数组长度自动计算分值） ======
+    const wordsAll = [
+      {"english":"math","phonetic":"/mæθ/","translation_zh":"数学","example_en":"Math is challenging. It takes me a long time to finish my homework.","example_zh":"数学很有挑战性。我做作业要花很长时间。"},
+      {"english":"literature","phonetic":"/ˈlɪt.rə.tʃər/","translation_zh":"文学","example_en":"Literature is fascinating. I always want to read more.","example_zh":"文学很迷人。我总是想多读一些。"},
+      {"english":"history","phonetic":"/ˈhɪs.t(ə)ri/","translation_zh":"历史","example_en":"History is thought-provoking. It makes me think about the past.","example_zh":"历史发人深省。它让我思考过去。"},
+      {"english":"business","phonetic":"/ˈbɪz.nɪs/","translation_zh":"商业","example_en":"Business is competitive. Many people want to be the best.","example_zh":"商业很有竞争力。很多人想成为最优秀的。"},
+      {"english":"graphic design","phonetic":"/ˌɡræf.ɪk dɪˈzaɪn/","translation_zh":"平面设计","example_en":"Graphic design is fun. I enjoy making new pictures.","example_zh":"平面设计很有趣。我喜欢画新图。"},
+      {"english":"art","phonetic":"/ɑːt/","translation_zh":"艺术","example_en":"Art is inspiring. It makes me want to create something.","example_zh":"艺术很鼓舞人心。它让我想创作东西。"},
+      {"english":"chemistry","phonetic":"/ˈkem.ɪ.stri/","translation_zh":"化学","example_en":"Chemistry is complicated. There are many rules to remember.","example_zh":"化学很复杂。有很多规则要记住。"},
+      {"english":"physics","phonetic":"/ˈfɪz.ɪks/","translation_zh":"物理","example_en":"Physics is logical. The answers follow clear rules.","example_zh":"物理很有逻辑性。答案遵循明确的规则。"},
+      {"english":"geography","phonetic":"/dʒiˈɒɡ.rə.fi/","translation_zh":"地理","example_en":"Geography is interesting. I like learning about new places.","example_zh":"地理很有趣。我喜欢了解新的地方。"},
+      {"english":"biology","phonetic":"/baɪˈɒl.ə.dʒi/","translation_zh":"生物","example_en":"Biology is practical. It helps me understand living things.","example_zh":"生物很实用。它帮助我了解生物。"},
+      {"english":"physical education","phonetic":"/ˌfɪz.ɪ.kəl ed.jʊˈkeɪ.ʃən/","translation_zh":"体育","example_en":"Physical education is energetic. We move a lot in class.","example_zh":"体育课很有活力。我们在课堂上活动很多。"},
+      {"english":"graduate","phonetic":"/ˈɡrædʒ.u.ət/","translation_zh":"毕业生","example_en":"Graduate study is serious. You must work very hard.","example_zh":"研究生学习很严肃。你必须非常努力。"},
+      {"english":"undergraduate","phonetic":"/ˌʌn.dəˈɡrædʒ.u.ət/","translation_zh":"本科生","example_en":"Undergraduate life is exciting. There are many new things to try.","example_zh":"本科生活很令人兴奋。有很多新事物可以尝试。"},
+      {"english":"university","phonetic":"/ˌjuː.nɪˈvɜː.sɪ.ti/","translation_zh":"大学","example_en":"University is amazing. You can meet many different people.","example_zh":"大学很棒。你可以认识很多不同的人。"},
+      {"english":"exchange program","phonetic":"/ɪksˈtʃeɪndʒ ˌprəʊ.ɡræm/","translation_zh":"交换项目","example_en":"An exchange program is motivating. It makes me want to study more.","example_zh":"交换项目很有激励作用。它让我想更努力学习。"},
+      {"english":"easy","phonetic":"/ˈiː.zi/","translation_zh":"容易的","example_en":"Geography is easy. I can remember the country names.","example_zh":"地理很容易。我能记住国家的名字。"},
+      {"english":"boring","phonetic":"/ˈbɔː.rɪŋ/","translation_zh":"无聊的","example_en":"Literature is boring. I don’t enjoy reading long books.","example_zh":"文学很无聊。我不喜欢读长篇书。"},
+      {"english":"useful","phonetic":"/ˈjuːs.fəl/","translation_zh":"有用的","example_en":"Math is useful. I can use it to plan my budget.","example_zh":"数学很有用。我可以用它来计划预算。"},
+      {"english":"fun","phonetic":"/fʌn/","translation_zh":"有趣的","example_en":"Undergraduate study is fun. I can join many clubs.","example_zh":"本科学习很有趣。我可以加入很多社团。"},
+      {"english":"tiring","phonetic":"/ˈtaɪə.rɪŋ/","translation_zh":"累人的","example_en":"Physical education is tiring. I need to rest after class.","example_zh":"体育课很累。下课后我需要休息。"},
+      {"english":"logical","phonetic":"/ˈlɒdʒ.ɪ.kəl/","translation_zh":"合逻辑的","example_en":"Chemistry is logical. The results follow the rules.","example_zh":"化学很有逻辑性。结果遵循规则。"},
+      {"english":"confusing","phonetic":"/kənˈfjuː.zɪŋ/","translation_zh":"令人困惑的","example_en":"Math is confusing. I don’t understand some of the problems.","example_zh":"数学让人困惑。我不理解有些题目。"},
+      {"english":"interesting","phonetic":"/ˈɪn.trə.stɪŋ/","translation_zh":"有趣的","example_en":"History is interesting. I love hearing the stories.","example_zh":"历史很有趣。我喜欢听这些故事。"},
+      {"english":"inspiring","phonetic":"/ɪnˈspaɪə.rɪŋ/","translation_zh":"鼓舞人心的","example_en":"Literature is inspiring. It makes me want to write.","example_zh":"文学很鼓舞人心。它让我想写作。"},
+      {"english":"exciting","phonetic":"/ɪkˈsaɪ.tɪŋ/","translation_zh":"令人兴奋的","example_en":"Graduate life is exciting. There are many new experiences.","example_zh":"研究生生活很令人兴奋。有很多新体验。"},
+      {"english":"serious","phonetic":"/ˈsɪə.ri.əs/","translation_zh":"严肃的","example_en":"University life is serious. The exams are very important.","example_zh":"大学生活很严肃。考试很重要。"},
+      {"english":"complicated","phonetic":"/ˈkɒm.plɪ.keɪ.tɪd/","translation_zh":"复杂的","example_en":"Biology is complicated. It has many details.","example_zh":"生物很复杂。它有很多细节。"},
+      {"english":"amazing","phonetic":"/əˈmeɪ.zɪŋ/","translation_zh":"惊人的","example_en":"Geography is amazing. There are many beautiful places.","example_zh":"地理很惊人。有很多美丽的地方。"},
+      {"english":"important","phonetic":"/ɪmˈpɔː.tənt/","translation_zh":"重要的","example_en":"History is important. It helps us understand today’s world.","example_zh":"历史很重要。它帮助我们了解今天的世界。"},
+      {"english":"challenging","phonetic":"/ˈtʃæl.ɪn.dʒɪŋ/","translation_zh":"有挑战性的","example_en":"Physics is challenging. Some ideas are hard to understand.","example_zh":"物理很有挑战性。有些概念很难理解。"}
+    ];
+
+    // === Deck helpers (dynamic) ===
+    const words = wordsAll; // if you want a subset, use wordsAll.slice(0, N)
+    function getAllIndices() { return words.map((_, i) => i); }
+    function totalTerms() { return words.length; }
+
+    // App state (dynamic)
+    let INITIAL_INDICES = getAllIndices();
+    let currentIndices = [...INITIAL_INDICES];
+    let practiceIndices = [];
+    let index = 0;
+    let practiceMode = false;
+    const startedAt = Date.now();
+
+    // Track first decision per card for fair scoring out of totalTerms()
+    const firstDecision = new Map(); // key = index (0..N-1), value = 'know' | 'practice'
+
+    // ===== DOM =====
+    const cardEl = document.getElementById('card');
+    const frontWordEl = document.getElementById('frontWord');
+    const frontPhonEl = document.getElementById('frontPhon');
+    const backTransZhEl = document.getElementById('backTransZh');
+    const exEnEl = document.getElementById('exEn');
+    const exZhEl = document.getElementById('exZh');
+    const audioFrontEl = document.getElementById('audioFront');
+    const audioBackEl = document.getElementById('audioBack');
+    const congratsEl = document.getElementById('congratsMsg');
+    const reviewControlsEl = document.getElementById('reviewControls');
+    const congratsSummaryEl = document.getElementById('congratsSummary');
+    const siteTitleEl = document.getElementById('siteTitle');
+    const siteInstrEl = document.getElementById('siteInstr');
+
+    // Set dynamic title/instructions
+    function refreshHeader() {
+      siteTitleEl.innerHTML = `教育部 - 出国人员培训部<br/>第1周 • 英→中 闪卡`;
+      siteInstrEl.innerHTML = `点击卡片以翻转。点击音频图标🔊可收听单词或句子。`;
+    }
+    refreshHeader();
+
+    function showCard() {
+      const w = words[currentIndices[index]];
+      frontWordEl.textContent = w.english;
+      frontPhonEl.textContent = w.phonetic;
+      backTransZhEl.textContent = w.translation_zh;
+      exEnEl.innerHTML = highlightWord(w.example_en, w.english);
+      exZhEl.textContent = w.example_zh;
+      cardEl.classList.remove('flipped');
+    }
+
+    // === FIXED: proper regex escape + highlighter ===
+    function esc(s) {
+      return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+    function highlightWord(sentence, word) {
+      const pattern = new RegExp(`\\b${esc(word)}\\b`, 'gi');
+      return sentence.replace(pattern, (m) => `<span class="highlight">${m}</span>`);
+    }
+
+    // 点击翻转
+    cardEl.addEventListener('click', () => { cardEl.classList.toggle('flipped'); });
+
+    // ===== Independent audio per side =====
+    const AUDIO_BASE = 'audio/';
+    function slugify(text) { return text.toLowerCase().replace(/[^a-z\s]/g, '').trim().replace(/\s+/g, '_'); }
+    function wordAudioName(english){ return slugify(english) + '.mp3'; }
+    function sentAudioName(english){ return slugify(english) + '_sen.mp3'; }
+    function audioUrl(name) { return AUDIO_BASE + name; }
+    function playWord() {
+      const w = words[currentIndices[index]];
+      new Audio(audioUrl(wordAudioName(w.english))).play().catch(()=>{});
+    }
+    function playSentence() {
+      const w = words[currentIndices[index]];
+      new Audio(audioUrl(sentAudioName(w.english))).play().catch(()=>{});
+    }
+    audioFrontEl.addEventListener('click', (e) => { e.stopPropagation(); playWord(); });
+    audioBackEl.addEventListener('click', (e) => { e.stopPropagation(); playSentence(); });
+
+    // ===== Buttons =====
+    document.getElementById('knowBtn').addEventListener('click', () => { record('know'); nextCard(); });
+    document.getElementById('practiceBtn').addEventListener('click', () => { record('practice'); nextCard(); });
+
+    function record(action) {
+      const cardIdx = currentIndices[index];
+      if (!firstDecision.has(cardIdx)) firstDecision.set(cardIdx, action);
+      if (action === 'practice' && !practiceIndices.includes(cardIdx)) practiceIndices.push(cardIdx);
+    }
+
+    function nextCard() {
+      if (index < currentIndices.length - 1) {
+        index++;
+        showCard();
+      } else {
+        cardEl.classList.add('hidden');
+        if (!practiceMode && practiceIndices.length > 0) {
+          reviewControlsEl.classList.remove('hidden');
+        } else {
+          const s = computeSummary();
+          congratsSummaryEl.textContent = `掌握：${s.known}/${s.total} • 需练习：${s.practice}/${s.total} • 得分：${s.score}%`;
+          congratsEl.classList.remove('hidden');
+        }
+      }
+    }
+
+    document.getElementById('reviewPractice').addEventListener('click', () => {
+      practiceMode = true;
+      currentIndices = [...practiceIndices];
+      index = 0;
+      reviewControlsEl.classList.add('hidden');
+      congratsEl.classList.add('hidden');
+      cardEl.classList.remove('hidden');
+      showCard();
+    });
+
+    document.getElementById('reviewAll').addEventListener('click', () => {
+      // reset to the full, dynamic deck
+      practiceMode = false;
+      INITIAL_INDICES = getAllIndices();
+      currentIndices = [...INITIAL_INDICES];
+      practiceIndices = [];
+      index = 0;
+      congratsEl.classList.add('hidden');
+      reviewControlsEl.classList.add('hidden');
+      refreshHeader();
+      showCard();
+    });
+
+    document.getElementById('prevBtn').addEventListener('click', () => { if (index > 0) { index--; showCard(); } });
+    document.getElementById('nextBtn').addEventListener('click', () => nextCard());
+
+    function computeSummary() {
+      // Dynamic score out of total terms
+      const total = totalTerms();
+      let known = 0;
+      getAllIndices().forEach(i => { if (firstDecision.get(i) === 'know') known++; });
+      const practice = total - known;
+      const score = Math.round((known / Math.max(total,1)) * 100);
+      return { known, practice, score, total };
+    }
+
+    // ===== PDF 导出（打印为 PDF） =====
+    function buildReport() {
+      const student = (document.getElementById('studentId').value || '').trim();
+      const finishedAt = new Date();
+      const started = new Date(startedAt);
+      const s = computeSummary();
+
+      const meta = [
+        `<div><strong>词库：</strong>第1周 • 英→中（共 ${s.total} 个词条）</div>`,
+        `<div><strong>学生：</strong> ${student || '（未填写）'}</div>`,
+        `<div><strong>开始时间：</strong> ${started.toLocaleString()}</div>`,
+        `<div><strong>结束时间：</strong> ${finishedAt.toLocaleString()}</div>`
+      ].join('');
+      document.getElementById('reportMeta').innerHTML = meta;
+
+      const st = document.getElementById('summaryTable');
+      st.innerHTML = `
+        <tr><th>总词数</th><td>${s.total}</td></tr>
+        <tr><th>已掌握</th><td>${s.known}</td></tr>
+        <tr><th>需要练习</th><td>${s.practice}</td></tr>
+        <tr class="score-row"><th>得分</th><td>${s.score}%</td></tr>
+      `;
+    }
+
+    document.getElementById('downloadPdfBtn').addEventListener('click', () => {
+      buildReport();
+      window.print(); // 选择“另存为 PDF”
+    });
+
+    // 初始化：载入首张
+    showCard();
+  </script>
+</body>
+</html>
